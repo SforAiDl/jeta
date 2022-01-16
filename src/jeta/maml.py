@@ -1,10 +1,7 @@
-import numpy as np
-from functools import partial
-
 import jax
-from flax import nn, optim
+from flax import optim
 
-from loss import task_loss
+from jeta.loss import task_loss
 
 
 @jax.jit
@@ -27,11 +24,17 @@ def maml_fit_task(model, batch):
 
     """
     maml_lr = 0.001  # TODO: Allow this as an argument.
+    fas = 5
     inner_optimizer_def = optim.GradientDescent(learning_rate=maml_lr)
 
     model_grad = jax.grad(task_loss)(model, batch)
-    # Create a new optimizer for the given `model`. This is analogous to creating a learner for each task using `.clone()`.
+    # Create a new optimizer for the given `model`.
+    # This is analogous to creating a learner for each task using `.clone()`.
     inner_opt = inner_optimizer_def.create(model)
     for _ in range(fas):  # Do fast adaptation for `fas` number of times.
-        inner_opt = inner_opt.apply_gradient(model_grad)  # Analogous to `learner.adapt` step from `learn2learn`.
-    return inner_opt.target  # return the updated model which is stored as an attribute of the updated optimizer.
+        inner_opt = inner_opt.apply_gradient(
+            model_grad
+        )  # Analogous to `learner.adapt` step from `learn2learn`.
+    return (
+        inner_opt.target
+    )  # return the updated model stored as an attribute of the updated optimizer.
