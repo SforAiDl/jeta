@@ -1,6 +1,7 @@
-from setuptools import find_packages, setup
-import os
 import codecs
+import os
+
+from setuptools import find_packages, setup
 
 NAME = "Jeta"
 DESCRIPTION = "A JAX based meta learning library"
@@ -15,14 +16,13 @@ AUTHOR = "Society for Artificial Intelligence and Deep Learning"
 EMAIL = "vedantshah2012@gmail.com"
 LICENSE = "MIT"
 REPO_URL = "https://github.com/SforAiDl/jeta"
-PROJECT_URLS = {
-    "Source": REPO_URL
-}
+PROJECT_URLS = {"Source": REPO_URL}
 CLASSIFIERS = (
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent"
+    "Operating System :: OS Independent",
 )
+
 
 def read(*parts):
     """
@@ -30,6 +30,7 @@ def read(*parts):
     """
     with codecs.open(os.path.join(PROJECT, *parts), "rb", "utf-8") as file:
         return file.read()
+
 
 def get_requires(path):
     """
@@ -39,6 +40,7 @@ def get_requires(path):
         line = line.strip()
         if line and not line.startswith("#"):
             yield line
+
 
 INSTALL_REQUIRES = list(get_requires("requirements.txt"))
 
@@ -62,4 +64,3 @@ CONFIG = {
 
 if __name__ == "__main__":
     setup(**CONFIG)
-    
