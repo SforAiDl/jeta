@@ -2,8 +2,9 @@ import jax
 import jax.numpy as jnp
 import optax
 
+
 @jax.jit
-def task_loss(model, batch):
+def task_loss(model, batch, ways):
     """Calculates loss for a single classification task."""
     x, labels = batch
     logits = model(x)

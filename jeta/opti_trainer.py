@@ -1,10 +1,12 @@
+from functools import partial
+
 import jax
 import jax.numpy as jnp
-
 from loss import task_loss
 
+
 @jax.jit
-def train_step(optimizer, batch, fit_task):
+def train_step(optimizer, batch, fit_task, ways):
     """Perform the training step used for each epoch.
 
     Parameters
@@ -47,7 +49,7 @@ def train_step(optimizer, batch, fit_task):
         # TODO: Allow *args/**kwargs for `fit_task`.
         updated_model = fit_task(model, train_batch)
         # Evaluate on query set to get the loss on the query set.
-        loss = task_loss(updated_model, val_batch)
+        loss = partial(task_loss, ways=ways)(updated_model, val_batch)
         return loss
 
     @jax.jit
@@ -63,13 +65,12 @@ def train_step(optimizer, batch, fit_task):
 
         """
         train_x, train_y, val_x, val_y = batch
-        task_losses = jax.vmap(partial(loss, model))(  # Apply the `loss` function to each task. `vmap` is used to apply it on all tasks.
-            train_x, train_y, val_x, val_y
-        )
+        # Apply the `loss` function to each task. `vmap` is used to apply it on all tasks.
+        task_losses = jax.vmap(partial(loss, model))(train_x, train_y, val_x, val_y)
         return jnp.mean(task_losses)
 
-    loss, grad = jax.value_and_grad(loss_fn)(model)
+    loss_value, grad = jax.value_and_grad(loss_fn)(model)
     # `apply_gradient` returns a new `Optimizer` instance with the updated target and optimizer state.
     optimizer = optimizer.apply_gradient(grad)
 
-    return optimizer, loss
+    return optimizer, loss_value
