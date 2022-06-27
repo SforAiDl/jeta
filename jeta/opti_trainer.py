@@ -1,10 +1,9 @@
-import jax
-from jax.numpy import ndarray
-
-from flax.training import train_state
-from flax import struct
-
 from typing import Callable, Tuple
+
+import jax
+from flax import struct
+from flax.training import train_state
+from jax.numpy import ndarray
 
 
 class MetaTrainState(train_state.TrainState):
@@ -12,13 +11,7 @@ class MetaTrainState(train_state.TrainState):
     loss_fn: Callable = struct.field(pytree_node=False)
 
 
-
-
-
-
-
 class OptiTrainer:
-    
     @staticmethod
     def create(params, apply_fn, adapt_fn, loss_fn, tx) -> MetaTrainState:
         """Creates a new MetaTrainState object which is the default object used for training.
@@ -35,7 +28,9 @@ class OptiTrainer:
             MetaTrainState: Initialized MetaTrainState object.
         """
 
-        return MetaTrainState.create(params=params, apply_fn=apply_fn, adapt_fn=adapt_fn, loss_fn=loss_fn, tx=tx)
+        return MetaTrainState.create(
+            params=params, apply_fn=apply_fn, adapt_fn=adapt_fn, loss_fn=loss_fn, tx=tx
+        )
 
     @staticmethod
     @jax.jit
@@ -54,12 +49,17 @@ class OptiTrainer:
         """
 
         def batch_meta_train_loss(params, apply_fn, adapt_fn, loss_fn, tasks):
-            loss = jax.vmap(OptiTrainer.meta_loss, in_axes=(None, None, None, None, 0))(params, apply_fn, adapt_fn, loss_fn, tasks)
+            loss = jax.vmap(OptiTrainer.meta_loss, in_axes=(None, None, None, None, 0))(
+                params, apply_fn, adapt_fn, loss_fn, tasks
+            )
             return loss.mean()
-        loss, grads = jax.value_and_grad(batch_meta_train_loss)(state.params, state.apply_fn, state.adapt_fn, state.loss_fn, tasks)
+
+        loss, grads = jax.value_and_grad(batch_meta_train_loss)(
+            state.params, state.apply_fn, state.adapt_fn, state.loss_fn, tasks
+        )
         state = state.apply_gradients(grads=grads)
         return state, loss
-    
+
     @staticmethod
     @jax.jit
     def meta_test_step(state: MetaTrainState, tasks) -> ndarray:
@@ -71,7 +71,7 @@ class OptiTrainer:
         Args:
             state (MetaTrainState): Contains information regarding the current state.
             tasks ((x_train, y_train), (x_test, y_test)): Batch of tasks to be trained on.
-        
+
         Returns:
             jnp.ndarray: Loss.
 
@@ -80,9 +80,10 @@ class OptiTrainer:
         apply_fn = state.apply_fn
         loss_fn = state.loss_fn
         adapt_fn = state.adapt_fn
-        loss = jax.vmap(OptiTrainer.meta_loss, in_axes=(None, None, None, None, 0))(params, apply_fn, adapt_fn, loss_fn, tasks)
+        loss = jax.vmap(OptiTrainer.meta_loss, in_axes=(None, None, None, None, 0))(
+            params, apply_fn, adapt_fn, loss_fn, tasks
+        )
         return loss.mean()
-    
 
     @staticmethod
     def meta_loss(params, apply_fn, adapt_fn, loss_fn, task) -> ndarray:
@@ -100,12 +101,11 @@ class OptiTrainer:
             jnp.ndarray: Loss of the task.
         """
         support_set, query_set = task
-        
+
         # Adaptation step
         theta = adapt_fn(params, apply_fn, loss_fn, support_set)
 
-
         # Evaluation step
         x_train, y_train = query_set
-        logits = apply_fn({'params': theta}, x_train)
+        logits = apply_fn({"params": theta}, x_train)
         return loss_fn(logits, y_train).mean()

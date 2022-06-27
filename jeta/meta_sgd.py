@@ -3,21 +3,20 @@ from typing import Any, Callable, Tuple
 import jax
 import jax.numpy as jnp
 from flax import core
-from flax import linen as nn
 
 # from loss import mse
 
 
-def maml_adapt(
+def meta_sgd_adapt(
     params: core.FrozenDict[str, Any],
     apply_fn: Callable[[core.FrozenDict[str, Any], jnp.ndarray], jnp.ndarray],
     loss_fn: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
     support_set: Tuple[jnp.ndarray, jnp.ndarray],
 ) -> core.FrozenDict[str, Any]:
 
-    """Adapts with respect to the support set using the MAML algorithm.
+    """Adapts with respect to the support set using the Meta-SGD algorithm.
 
-    Paper: https://arxiv.org/abs/1703.03400
+    Paper: https://arxiv.org/abs/1707.09835
 
     Args:
         params: The parameters of the model.
@@ -30,28 +29,32 @@ def maml_adapt(
     """
 
     theta = params["params"]
-
-    maml_lr = 0.01  # Inner Learning rate. TODO: take this parameter as an argument
-    fas = 1  # Fast adaptation steps. TODO: take this parameter as an argument
+    alpha = params["alpha"]
 
     def loss(theta, batch):
         x_train, y_train = batch
         logits = apply_fn({"params": theta}, x_train)
         return loss_fn(logits, y_train)
 
+    fas = 1  # Fast adaptation steps. TODO: take this parameter as an argument
+
     for _ in range(fas):
         grads = jax.grad(loss)(theta, support_set)
-        theta = jax.tree_util.tree_map(lambda t, g: t - maml_lr * g, theta, grads)
+        theta = jax.tree_util.tree_map(lambda t, g, a: t - a * g, theta, grads, alpha)
 
     return theta
 
 
-def maml_init(model: nn.Module, init_key, arr: jnp.ndarray):
+def meta_sgd_init(model, init_key, arr):
     """Initializes the parameters of the model.
 
     The default parameters initilized by flax don't convege for
     optimization based meta learning algorithms.
     Hence they are scaled to match a normal distribution with mean 0 and std 0.01.
+
+    In addition, this function adds a new parameter 'alpha' to the model.
+    This parameter is of the same shape as the weights (and biases) of the model
+    and initialised to 0.01. This parameter is used to scale the gradients
 
     Args:
         model (nn.Module): model whose parameters are to be initialised
@@ -62,11 +65,12 @@ def maml_init(model: nn.Module, init_key, arr: jnp.ndarray):
         Parameters: A frozen dict of model parameters.
     """
 
-    EPSILON = 1e-8  # to avoid division by zero
+    EPSILON = 1e-8
     params = model.init(init_key, arr).unfreeze()
-    # Paramters are scaled to match a normal distribution with mean 0 and std 0.01
+    alpha = jax.tree_util.tree_map(lambda t: jnp.ones_like(t) * 0.01, params["params"])
     params = jax.tree_util.tree_map(
         lambda p: 0.01 * (p - p.mean()) / (p.std() + EPSILON), params
     )
+    params["alpha"] = alpha
     params = core.frozen_dict.freeze(params)
     return params
