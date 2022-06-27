@@ -1,76 +1,111 @@
-from functools import partial
-
 import jax
-import jax.numpy as jnp
-from loss import task_loss
+from jax.numpy import ndarray
+
+from flax.training import train_state
+from flax import struct
+
+from typing import Callable, Tuple
 
 
-@jax.jit
-def train_step(optimizer, batch, fit_task, ways):
-    """Perform the training step used for each epoch.
+class MetaTrainState(train_state.TrainState):
+    adapt_fn: Callable = struct.field(pytree_node=False)
+    loss_fn: Callable = struct.field(pytree_node=False)
 
-    Parameters
-    ----------
-    optimizer: flax.optim.Optimizer
-        An optimizer object.
-    batch: tuple
-        A batch of tasks: (X_adap, y_adap, X_eval, y_eval)
-    fit_task: A callable that fits on a given task and returns the updated model.
 
-    Returns
-    -------
-    optimizer: flax.optim.Optimizer
-        The updated optimizer object.
-    loss: float
-        Loss for an epoch.
 
-    """
-    model = optimizer.target
 
+
+
+
+class OptiTrainer:
+    
+    @staticmethod
+    def create(params, apply_fn, adapt_fn, loss_fn, tx) -> MetaTrainState:
+        """Creates a new MetaTrainState object which is the default object used for training.
+
+        Args:
+            params (flax.core.FrozenDict[str, Any]): Parameters of the model.
+            apply_fn ((params, x) -> y): Function that applies the model to a batch of data.
+            adapt_fn ((params, apply_fn, loss_fn, support_set) -> adapted_params): Specific meta learning function
+            which adapts to the support set.
+            loss_fn ((logits, targets) -> loss): Loss Function.
+            tx (Optax Optimizer): Optax optimizer.
+
+        Returns:
+            MetaTrainState: Initialized MetaTrainState object.
+        """
+
+        return MetaTrainState.create(params=params, apply_fn=apply_fn, adapt_fn=adapt_fn, loss_fn=loss_fn, tx=tx)
+
+    @staticmethod
     @jax.jit
-    def loss(model, train_x, train_y, val_x, val_y):
-        """Calculates loss on the query set after fitting `model` to the support set.
+    def meta_train_step(state: MetaTrainState, tasks) -> Tuple[MetaTrainState, ndarray]:
+        """Performs a single meta-training step on a batch of tasks.
 
-        Parameters
-        ----------
-        model: flax.nn.Model
-        train_x, train_y: Support set for a single task.
-        val_x, val_y: Query set for a single task.
+        The fuctions first adapts to the support set and then evaluates it's perfomance
+        on the query set.
 
-        Returns
-        -------
-        loss: float
-            Task loss.
+        Args:
+            state (MetaTrainState): Contains information regarding the current state.
+            tasks ((x_train, y_train), (x_test, y_test)): Batch of tasks to be trained on.
 
+        Returns:
+            Tuple[MetaTrainState, jnp.ndarray]: (Next_State, Loss).
         """
-        train_batch = (train_x, train_y)
-        val_batch = (val_x, val_y)
-        # Fast adaptation (inner loop)
-        # TODO: Allow *args/**kwargs for `fit_task`.
-        updated_model = fit_task(model, train_batch)
-        # Evaluate on query set to get the loss on the query set.
-        loss = partial(task_loss, ways=ways)(updated_model, val_batch)
-        return loss
 
+        def batch_meta_train_loss(params, apply_fn, adapt_fn, loss_fn, tasks):
+            loss = jax.vmap(OptiTrainer.meta_loss, in_axes=(None, None, None, None, 0))(params, apply_fn, adapt_fn, loss_fn, tasks)
+            return loss.mean()
+        loss, grads = jax.value_and_grad(batch_meta_train_loss)(state.params, state.apply_fn, state.adapt_fn, state.loss_fn, tasks)
+        state = state.apply_gradients(grads=grads)
+        return state, loss
+    
+    @staticmethod
     @jax.jit
-    def loss_fn(model):
+    def meta_test_step(state: MetaTrainState, tasks) -> ndarray:
+        """Performs a single meta-testing step on a batch of tasks.
+
+        The function first adapts to the support set and then evaluates it's perfomance
+        on the query set.
+
+        Args:
+            state (MetaTrainState): Contains information regarding the current state.
+            tasks ((x_train, y_train), (x_test, y_test)): Batch of tasks to be trained on.
+        
+        Returns:
+            jnp.ndarray: Loss.
+
         """
-        Parameters
-        ----------
-        model: flax.nn.Model
+        params = state.params
+        apply_fn = state.apply_fn
+        loss_fn = state.loss_fn
+        adapt_fn = state.adapt_fn
+        loss = jax.vmap(OptiTrainer.meta_loss, in_axes=(None, None, None, None, 0))(params, apply_fn, adapt_fn, loss_fn, tasks)
+        return loss.mean()
+    
 
-        Returns
-        -------
-        Mean of task losses.
+    @staticmethod
+    def meta_loss(params, apply_fn, adapt_fn, loss_fn, task) -> ndarray:
+        """Calculates the Meta Loss of a task
 
+        Args:
+            params (flax.core.FrozenDict[str, Any]): Parameters of the model.
+            apply_fn ((params, x) -> y): Function that applies the model to a batch of data.
+            adapt_fn ((params, apply_fn, loss_fn, support_set) -> adapted_params): Specific meta learning function
+            which adapts to the support set.
+            loss_fn ((logits, targets) -> loss): Loss Function.
+            tx (Optax Optimizer): Optax optimizer.
+
+        Returns:
+            jnp.ndarray: Loss of the task.
         """
-        train_x, train_y, val_x, val_y = batch
-        # Apply the `loss` function to each task. `vmap` is used to apply it on all tasks.
-        task_losses = jax.vmap(partial(loss, model))(train_x, train_y, val_x, val_y)
-        return jnp.mean(task_losses)
+        support_set, query_set = task
+        
+        # Adaptation step
+        theta = adapt_fn(params, apply_fn, loss_fn, support_set)
 
-    loss_value, grad = jax.value_and_grad(loss_fn)(model)
-    # `apply_gradient` returns a new `Optimizer` instance with the updated target and optimizer state.
-    optimizer = optimizer.apply_gradient(grad)
 
-    return optimizer, loss_value
+        # Evaluation step
+        x_train, y_train = query_set
+        logits = apply_fn({'params': theta}, x_train)
+        return loss_fn(logits, y_train).mean()
