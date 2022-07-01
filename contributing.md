@@ -62,7 +62,6 @@ pre-commit run --all-files
 ```bash
 git add .
 git commit -m "Description about the changes"
-
 git push origin <branch name>
 ```
 
