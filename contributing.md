@@ -66,4 +66,7 @@ git commit -m "Description about the changes"
 git push origin <branch name>
 ```
 
-8) Open up a pull request on github
+8) Open up a pull request on github. 
+If all previous checks and tests pass, please send a pull request.
+
+

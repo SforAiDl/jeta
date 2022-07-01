@@ -73,4 +73,3 @@ dependencies:
     - typing-extensions==3.10.0.0
     - urllib3==1.26.9
     - zipp==3.8.0
-prefix: /home/abhijit/anaconda3/envs/jax_new
