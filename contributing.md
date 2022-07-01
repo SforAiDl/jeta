@@ -1,6 +1,6 @@
 # Contributions
 
-Contributions are always welcome :smile ! you can contribute in many ways. 
+Contributions are always welcome :smile: ! you can contribute in many ways. 
 
 ## Reporting Bugs
 
@@ -12,7 +12,7 @@ When reporting bugs please
 
 ## Fixing Bugs: 
 
-Issues tagged with `help wanted`,`good first issues` and `bug` are open for everyone.
+Issues tagged with `help wanted`, `good first issues`, and `bug` are open for everyone.
 
 ## Get Started
 
