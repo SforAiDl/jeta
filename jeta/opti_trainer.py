@@ -70,7 +70,7 @@ class OptiTrainer:
 
         Args:
             state (MetaTrainState): Contains information regarding the current state.
-            tasks ((x_train, y_train), (x_test, y_test)): Batch of tasks to be trained on.
+            tasks ((x_train, y_train), (x_test, y_test)): Batch of tasks to be evaluated on.
 
         Returns:
             jnp.ndarray: Loss.
@@ -95,7 +95,7 @@ class OptiTrainer:
             adapt_fn ((params, apply_fn, loss_fn, support_set) -> adapted_params): Specific meta learning function
             which adapts to the support set.
             loss_fn ((logits, targets) -> loss): Loss Function.
-            tx (Optax Optimizer): Optax optimizer.
+            tasks ((x_train, y_train), (x_test, y_test)): Batch of tasks to be trained on
 
         Returns:
             jnp.ndarray: Loss of the task.
