@@ -3,7 +3,6 @@ from typing import Any, Callable, Tuple
 import jax
 import jax.numpy as jnp
 from flax import core
-from flax import linen as nn
 
 # from loss import mse
 
@@ -30,43 +29,49 @@ def maml_adapt(
     """
 
     theta = params["params"]
+    mutable_params = [key for key in params if key != "params"]
 
     maml_lr = 0.01  # Inner Learning rate. TODO: take this parameter as an argument
     fas = 1  # Fast adaptation steps. TODO: take this parameter as an argument
 
     def loss(theta, batch):
         x_train, y_train = batch
-        logits = apply_fn({"params": theta}, x_train)
-        return loss_fn(logits, y_train)
+        logits, new_mutable_param_values = apply_fn(
+            params.copy({"params": theta}), x_train, train=True, mutable=mutable_params
+        )
+        return loss_fn(logits, y_train), new_mutable_param_values
 
     for _ in range(fas):
-        grads = jax.grad(loss)(theta, support_set)
+        grads, new_mutable_param_values = jax.grad(loss, has_aux=True)(
+            theta, support_set
+        )
+        params = params.copy(new_mutable_param_values)
         theta = jax.tree_util.tree_map(lambda t, g: t - maml_lr * g, theta, grads)
 
     return theta
 
 
-def maml_init(model: nn.Module, init_key, arr: jnp.ndarray):
-    """Initializes the parameters of the model.
+# def maml_init(model: nn.Module, init_key, arr: jnp.ndarray):
+#     """Initializes the parameters of the model.
 
-    The default parameters initilized by flax don't convege for
-    optimization based meta learning algorithms.
-    Hence they are scaled to match a normal distribution with mean 0 and std 0.01.
+#     The default parameters initilized by flax don't convege for
+#     optimization based meta learning algorithms.
+#     Hence they are scaled to match a normal distribution with mean 0 and std 0.01.
 
-    Args:
-        model (nn.Module): model whose parameters are to be initialised
-        init_key (random.PRNGKey): PRNG Key used for initialisation
-        arr (jnp.ndarray): a random array used to initialize the parameters
+#     Args:
+#         model (nn.Module): model whose parameters are to be initialised
+#         init_key (random.PRNGKey): PRNG Key used for initialisation
+#         arr (jnp.ndarray): a random array used to initialize the parameters
 
-    Returns:
-        Parameters: A frozen dict of model parameters.
-    """
+#     Returns:
+#         Parameters: A frozen dict of model parameters.
+#     """
 
-    EPSILON = 1e-8  # to avoid division by zero
-    params = model.init(init_key, arr).unfreeze()
-    # Paramters are scaled to match a normal distribution with mean 0 and std 0.01
-    params = jax.tree_util.tree_map(
-        lambda p: 0.01 * (p - p.mean()) / (p.std() + EPSILON), params
-    )
-    params = core.frozen_dict.freeze(params)
-    return params
+#     EPSILON = 1e-8  # to avoid division by zero
+#     params = model.init(init_key, arr).unfreeze()
+#     # Paramters are scaled to match a normal distribution with mean 0 and std 0.01
+#     params = jax.tree_util.tree_map(
+#         lambda p: 0.01 * (p - p.mean()) / (p.std() + EPSILON), params
+#     )
+#     params = core.frozen_dict.freeze(params)
+#     return params
