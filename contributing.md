@@ -87,3 +87,5 @@ git push origin <branch name>
 
 10) Open up a pull request on github.
 If all previous checks and tests pass, please send a pull request.
+If you are not familiar with creating a Pull Request, here is a guide:
+  - https://help.github.com/articles/creating-a-pull-request/
