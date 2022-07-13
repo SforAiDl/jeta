@@ -37,35 +37,53 @@ pip install -e
 ```
 
 4) Setup pre-commit hooks
+To automate the process of formatting code, we have configured the repo with pre-commit hooks to autoformat the staged files to ensure every commit complies with a style guide. This requires some setup, which is described below:
 
 ```bash
 pip install pre-commit
 pre-commit install
 ```
 
-5) Create a branch to work on specific issue
+5) Updating local branches
+
+Sometimes your local branches might not be in sync with the upstream branches. To update the local branches, run following command
 
 ```bash
-git checkout -b <branch name>
+git pull upstream master
 ```
 
-5) Add tests for the code you added and check the tests before commiting. To run these tests, run the following command from the root folder of jeta  `(jeta/)`
+
+6) Create a branch to work on specific issue, it is always advised to create a new branch from main branch for every new issue/patch.
+
+```bash
+git checkout -b <branch name for specific issue>
+```
+Running above will create a new branch and you will be switched to the new branch.
+
+7) Add tests for the code you added and check the tests before commiting. To run these tests, run the following command from the root folder of jeta  `(jeta/)`
 
 ```bash
 pytest tests
 ```
 
-6) Run pre-commit hooks to format your code into proper structure.
+To run a specific test, say run `test_sample` from `tests ` folder,
+```bash
+pytest tests/test_sample.py
+```
+
+Refer to the pytest [documentation](https://docs.pytest.org/) for more details.
+
+
+8) Run pre-commit hooks to format your code into proper structure.
 ```bash
 pre-commit run --all-files
 ```
-
-7) Commit your changes and push your branch to github
+9) Commit your changes and push your branch to github
 ```bash
 git add .
 git commit -m "Description about the changes"
 git push origin <branch name>
 ```
 
-8) Open up a pull request on github.
+10) Open up a pull request on github.
 If all previous checks and tests pass, please send a pull request.
