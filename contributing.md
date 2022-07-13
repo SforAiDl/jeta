@@ -1,16 +1,16 @@
 # Contributions
 
-Contributions are always welcome :smile: ! you can contribute in many ways. 
+Contributions are always welcome :smile: ! you can contribute in many ways.
 
 ## Reporting Bugs
 
 Report Bugs at https://github.com/sforaidl/jeta/issues
 
-When reporting bugs please 
-- Include the version and some information about your local environment setup. 
+When reporting bugs please
+- Include the version and some information about your local environment setup.
 - Way to reproduce the bug
 
-## Fixing Bugs: 
+## Fixing Bugs:
 
 Issues tagged with `help wanted`, `good first issues`, and `bug` are open for everyone.
 
@@ -20,18 +20,20 @@ Follow the steps to setup jeta for local development process
 
 1) Fork the Jeta repo on github
 
-2) clone your fork on local machine using following terminal command. 
+2) clone your fork on local machine using following terminal command.
 ```bash
 git clone https://github.com/<insert your github username>/jeta.git
 ```
 
-3) Create a conda virtual environment using `environment.yml` file. 
+3) Create a conda virtual environment and download the dependancies using `requirements.txt`
 
 ```bash
-conda env create -f environment.yml
-conda activate jeta_env
+conda create -n jeta
+conda activate jeta
+conda install pip
+pip install -r requirements.txt
 cd jeta/
-python setup.py develop
+pip install -e
 ```
 
 4) Setup pre-commit hooks
@@ -43,17 +45,17 @@ pre-commit install
 
 5) Create a branch to work on specific issue
 
-```bash 
+```bash
 git checkout -b <branch name>
 ```
 
-5) Add tests for the code you added and check the tests before commting. To run these tests, run following command from your root directory. 
+5) Add tests for the code you added and check the tests before commiting. To run these tests, run the following command from the root folder of jeta  `(jeta/)`
 
 ```bash
 pytest tests
 ```
 
-6) Run pre-commit hooks to format your code into proper structure. 
+6) Run pre-commit hooks to format your code into proper structure.
 ```bash
 pre-commit run --all-files
 ```
@@ -65,7 +67,5 @@ git commit -m "Description about the changes"
 git push origin <branch name>
 ```
 
-8) Open up a pull request on github. 
+8) Open up a pull request on github.
 If all previous checks and tests pass, please send a pull request.
-
-
