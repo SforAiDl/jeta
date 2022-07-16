@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-           
+
     steps:
       # Caching Linux
       - uses: actions/cache@v2
@@ -35,4 +35,3 @@ jobs:
         run: |
           pre-commit install
           pre-commit run -a
-
