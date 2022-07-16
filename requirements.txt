@@ -4,3 +4,4 @@ numpy==1.21.5
 optax==0.1.0
 pytest==6.2.5
 typing-extensions==3.10.0
+scipy==1.5
