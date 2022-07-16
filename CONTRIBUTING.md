@@ -33,7 +33,7 @@ conda activate jeta
 conda install pip
 pip install -r requirements.txt
 cd jeta/
-pip install -e
+pip install -e .
 ```
 
 4) Setup pre-commit hooks
@@ -49,7 +49,7 @@ pre-commit install
 Sometimes your local branches might not be in sync with the upstream branches. To update the local branches, run following command
 
 ```bash
-git pull upstream master
+git pull upstream main
 ```
 
 
