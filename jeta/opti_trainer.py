@@ -1,76 +1,154 @@
 from functools import partial
+from typing import Callable, List, Tuple
 
 import jax
-import jax.numpy as jnp
-from loss import task_loss
+import optax
+from flax import struct
+from flax.training import train_state
+from jax.numpy import ndarray
 
 
-@jax.jit
-def train_step(optimizer, batch, fit_task, ways):
-    """Perform the training step used for each epoch.
+class MetaTrainState(train_state.TrainState):
+    adapt_fn: Callable = struct.field(pytree_node=False)
+    loss_fn: Callable = struct.field(pytree_node=False)
 
-    Parameters
-    ----------
-    optimizer: flax.optim.Optimizer
-        An optimizer object.
-    batch: tuple
-        A batch of tasks: (X_adap, y_adap, X_eval, y_eval)
-    fit_task: A callable that fits on a given task and returns the updated model.
 
-    Returns
-    -------
-    optimizer: flax.optim.Optimizer
-        The updated optimizer object.
-    loss: float
-        Loss for an epoch.
+class OptiTrainer:
+    @staticmethod
+    def create(params, apply_fn, adapt_fn, loss_fn, tx) -> MetaTrainState:
+        """Creates a new MetaTrainState object which is the default object used for training.
 
-    """
-    model = optimizer.target
+        Args:
+            params (flax.core.FrozenDict[str, Any]): Parameters of the model.
+            apply_fn ((params, x) -> y): Function that applies the model to a batch of data.
+            adapt_fn ((params, apply_fn, loss_fn, support_set) -> adapted_params): Specific meta learning function
+            which adapts to the support set.
+            loss_fn ((logits, targets) -> loss): Loss Function.
+            tx (Optax Optimizer): Optax optimizer.
 
-    @jax.jit
-    def loss(model, train_x, train_y, val_x, val_y):
-        """Calculates loss on the query set after fitting `model` to the support set.
-
-        Parameters
-        ----------
-        model: flax.nn.Model
-        train_x, train_y: Support set for a single task.
-        val_x, val_y: Query set for a single task.
-
-        Returns
-        -------
-        loss: float
-            Task loss.
-
+        Returns:
+            MetaTrainState: Initialized MetaTrainState object.
         """
-        train_batch = (train_x, train_y)
-        val_batch = (val_x, val_y)
-        # Fast adaptation (inner loop)
-        # TODO: Allow *args/**kwargs for `fit_task`.
-        updated_model = fit_task(model, train_batch)
-        # Evaluate on query set to get the loss on the query set.
-        loss = partial(task_loss, ways=ways)(updated_model, val_batch)
-        return loss
 
-    @jax.jit
-    def loss_fn(model):
+        state = MetaTrainState.create(
+            params=params, apply_fn=apply_fn, adapt_fn=adapt_fn, loss_fn=loss_fn, tx=tx
+        )
+        return state.replace(opt_state=tx.init(params["params"]))
+
+    @staticmethod
+    @partial(jax.jit, static_argnums=(2,))
+    def meta_train_step(
+        state: MetaTrainState,
+        tasks,
+        metrics: List[Callable[[ndarray, ndarray], ndarray]] = [],
+    ) -> Tuple[MetaTrainState, ndarray, List[ndarray]]:
+        """Performs a single meta-training step on a batch of tasks.
+
+        The fuctions first adapts to the support set and then evaluates it's perfomance
+        on the query set.
+
+        Args:
+            state (MetaTrainState): Contains information regarding the current state.
+            tasks ((x_train, y_train), (x_test, y_test)): Batch of tasks to be trained on.
+            metrics (List[(ndarray, ndarray) -> ndarray]): List of metrics to be evaluated on the query set.
+
+        Returns:
+            Tuple[MetaTrainState, jnp.ndarray, List[jnp.ndarray]]: (Next_State, Loss, metrics).
         """
-        Parameters
-        ----------
-        model: flax.nn.Model
 
-        Returns
-        -------
-        Mean of task losses.
+        params = state.params
+        theta = params["params"]
 
+        def batch_meta_train_loss(theta, apply_fn, adapt_fn, loss_fn, tasks):
+            loss, metrics_value = jax.vmap(
+                OptiTrainer.meta_loss, in_axes=(None, None, None, None, 0, None)
+            )(
+                params.copy({"params": theta}),
+                apply_fn,
+                adapt_fn,
+                loss_fn,
+                tasks,
+                metrics,
+            )
+            return loss.mean(), [metric.mean() for metric in metrics_value]
+
+        (loss, metrics_value), grads = jax.value_and_grad(
+            batch_meta_train_loss, has_aux=True
+        )(theta, state.apply_fn, state.adapt_fn, state.loss_fn, tasks)
+        # state = state.apply_gradients(grads=grads)
+
+        # if state.step == 0: # Initialize optimizer
+        #     state = state.replace(opt_state=state.tx.init(state.params["params"]))
+
+        updates, new_opt_state = state.tx.update(
+            grads, state.opt_state, state.params["params"]
+        )
+        new_params = optax.apply_updates(state.params["params"], updates)
+        params = state.params.copy({"params": new_params})
+
+        state = state.replace(
+            step=state.step + 1, params=params, opt_state=new_opt_state
+        )
+
+        return state, loss, metrics_value
+
+    @staticmethod
+    @partial(jax.jit, static_argnums=(2,))
+    def meta_test_step(
+        state: MetaTrainState,
+        tasks,
+        metrics: List[Callable[[ndarray, ndarray], ndarray]] = [],
+    ) -> Tuple[ndarray, List[ndarray]]:
+        """Performs a single meta-testing step on a batch of tasks.
+
+        The function first adapts to the support set and then evaluates it's perfomance
+        on the query set.
+
+        Args:
+            state (MetaTrainState): Contains information regarding the current state.
+            tasks ((x_train, y_train), (x_test, y_test)): Batch of tasks to be evaluated on.
+            metrics (List[(ndarray, ndarray) -> ndarray]): List of metrics to be evaluated on the query set.
+
+        Returns:
+            Tuple[jnp.ndarray, List[jnp.ndarray]: (Loss, metrics).
         """
-        train_x, train_y, val_x, val_y = batch
-        # Apply the `loss` function to each task. `vmap` is used to apply it on all tasks.
-        task_losses = jax.vmap(partial(loss, model))(train_x, train_y, val_x, val_y)
-        return jnp.mean(task_losses)
 
-    loss_value, grad = jax.value_and_grad(loss_fn)(model)
-    # `apply_gradient` returns a new `Optimizer` instance with the updated target and optimizer state.
-    optimizer = optimizer.apply_gradient(grad)
+        params = state.params
+        apply_fn = state.apply_fn
+        loss_fn = state.loss_fn
+        adapt_fn = state.adapt_fn
+        loss, metrics_value = jax.vmap(
+            OptiTrainer.meta_loss, in_axes=(None, None, None, None, 0, None)
+        )(params, apply_fn, adapt_fn, loss_fn, tasks, metrics)
+        return loss.mean(), [metric.mean() for metric in metrics_value]
 
-    return optimizer, loss_value
+    @staticmethod
+    def meta_loss(
+        params, apply_fn, adapt_fn, loss_fn, task, metrics
+    ) -> Tuple[ndarray, List[ndarray]]:
+        """Calculates the Meta Loss of a task
+
+        Args:
+            params (flax.core.FrozenDict[str, Any]): Parameters of the model.
+            apply_fn ((params, x) -> y): Function that applies the model to a batch of data.
+            adapt_fn ((params, apply_fn, loss_fn, support_set) -> adapted_params): Specific meta learning function
+            which adapts to the support set.
+            loss_fn ((logits, targets) -> loss): Loss Function.
+            tasks ((x_train, y_train), (x_test, y_test)): Batch of tasks to be trained on
+
+        Returns:
+            Tuple[jnp.ndarray, List[jnp.ndarray]: (Loss, metrics).
+        """
+        support_set, query_set = task
+
+        # Adaptation step
+        theta = adapt_fn(params, apply_fn, loss_fn, support_set)
+
+        # Evaluation step
+        x_train, y_train = query_set
+        logits = apply_fn(params.copy({"params": theta}), x_train, train=False)
+
+        # Calculate metrics
+        metrics_value = [metric(logits, y_train) for metric in metrics]
+
+        return loss_fn(logits, y_train), metrics_value
