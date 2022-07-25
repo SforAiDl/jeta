@@ -3,7 +3,7 @@ from abc import ABC
 from jax import random
 
 
-class JetaBase(ABC):
+class BaseLearner(ABC):
     """Base Learner class
 
     Attributes:
