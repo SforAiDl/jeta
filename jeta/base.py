@@ -3,7 +3,7 @@ from abc import ABC
 from jax import random
 
 
-class BaseLearner(ABC):
+class JetaBase(ABC):
     """Base Learner class
 
     Attributes:
@@ -24,9 +24,7 @@ class BaseLearner(ABC):
         self.fas = fas
         self.losses = []
         self.seed = kwargs["seed"] if "seed" in kwargs else None
-        self.first_order = (
-            kwargs["first_order"] if "first_order" in kwargs else None
-        )  # for MAML and FOMAML
+        self.first_order = kwargs["first_order"] if "first_order" in kwargs else None
         if self.seed is not None:
             self.key = random.PRNGKey(self.seed)
 
