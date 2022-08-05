@@ -1,7 +1,9 @@
 # Adapted from https://github.com/learnables/learn2learn/blob/master/learn2learn/data/meta_dataset.pyx
 
-from torch.utils.data import Dataset
 from collections import defaultdict
+
+from torch.utils.data import Dataset
+
 
 class Dataset(Dataset):
     def __init__(self, dataset):
@@ -11,11 +13,10 @@ class Dataset(Dataset):
         for i in range(len(self.dataset)):
             try:
                 label = self.dataset[i][1]
-                if hasattr(label, 'item'):
+                if hasattr(label, "item"):
                     label = self.dataset[i][1].item()
             except ValueError as e:
-                raise ValueError(
-                    'Requires scalar labels. \n' + str(e))
+                raise ValueError("Requires scalar labels. \n" + str(e))
 
             labels_to_indices[label].append(i)
             indices_to_labels[i] = label
@@ -25,9 +26,9 @@ class Dataset(Dataset):
         self.labels = list(self.labels_to_indices.keys())
 
         self._bookkeeping = {
-            'labels_to_indices': self.labels_to_indices,
-            'indices_to_labels': self.indices_to_labels,
-            'labels': self.labels
+            "labels_to_indices": self.labels_to_indices,
+            "indices_to_labels": self.indices_to_labels,
+            "labels": self.labels,
         }
 
     def __getitem__(self, item):
@@ -35,5 +36,3 @@ class Dataset(Dataset):
 
     def __len__(self):
         return len(self.dataset)
-
-    
