@@ -71,7 +71,6 @@ def anil_adapt(
             state.params, support_set
         )
         state = state.apply_gradients(grads=grads)
-        print(list(state.params["params"].keys()))
         temp_params = state.params
         temp_params = flax.core.frozen_dict.freeze(temp_params)
         temp_params = temp_params.copy(new_mutable_param_values)
