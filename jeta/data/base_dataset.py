@@ -1,11 +1,14 @@
-# Adapted from https://github.com/learnables/learn2learn/blob/master/learn2learn/data/meta_dataset.pyx
-
 from collections import defaultdict
 
 from torch.utils.data import Dataset
 
 
-class Dataset(Dataset):
+class BaseDataset(Dataset):
+    """Wrapper for pytorch dataset with indices for task sampling
+
+    Adapted from https://github.com/learnables/learn2learn/blob/master/learn2learn/data/task_dataset.pyx
+    """
+
     def __init__(self, dataset):
         self.dataset = dataset
         labels_to_indices = defaultdict(list)
