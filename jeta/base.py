@@ -6,7 +6,7 @@ from jax import random
 class BaseLearner(ABC):
     """Base Learner class
 
-    Attributes:
+    Args:
         batch_size(int): batch size for training the algorithm on
         alpha(float): Learning rate
         fas(int): Fast adaptation steps
@@ -24,7 +24,6 @@ class BaseLearner(ABC):
         self.fas = fas
         self.losses = []
         self.seed = kwargs["seed"] if "seed" in kwargs else None
-        self.first_order = kwargs["first_order"] if "first_order" in kwargs else None
         if self.seed is not None:
             self.key = random.PRNGKey(self.seed)
 
