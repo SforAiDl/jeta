@@ -11,7 +11,7 @@ class BaseLearner(ABC):
         alpha(float): Learning rate
         fas(int): Fast adaptation steps
         seed(int): integer value for generating key for random generators
-        first_order(bool): True/False, for extending MAML to FO-MAML
+
 
     """
 
