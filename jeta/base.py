@@ -12,7 +12,6 @@ class BaseLearner(ABC):
         fas(int): Fast adaptation steps
         seed(int): integer value for generating key for random generators
 
-
     """
 
     def __init__(
@@ -31,7 +30,7 @@ class BaseLearner(ABC):
         """train algorithm
 
         Args:
-            params(ndarray): initial parameters for the model
+            params(FrozenDict): initial parameters for the model
             batch(ndarray): training batch for the algorithm
 
         Return:
@@ -43,7 +42,7 @@ class BaseLearner(ABC):
         """loss with current parameters
 
         Args:
-            params(ndarray): current set of parameters
+            params(FrozenDict): current set of parameters
             batch(ndarray): training batch for the algorithm
 
         Return:
@@ -55,7 +54,7 @@ class BaseLearner(ABC):
         """test algorithm
 
         Args:
-            params(ndarray): final set of parameters after training
+            params(FrozenDict): final set of parameters after training
             batch(ndarray): testing batch of data
 
         Return:
