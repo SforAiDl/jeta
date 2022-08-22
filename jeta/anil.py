@@ -72,7 +72,7 @@ def anil_adapt(
         )
         state = state.apply_gradients(grads=grads)
         if 'batch_stats'  in list(state.params.keys()) :
-          temp_params = state.params
+          temp_params=state.params
           temp_params = flax.core.frozen_dict.freeze(temp_params)
           temp_params = temp_params.copy(new_mutable_param_values)
           state.params['batch_stats'] =  flax.core.frozen_dict.unfreeze(temp_params['batch_stats'])
