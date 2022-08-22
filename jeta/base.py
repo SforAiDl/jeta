@@ -34,7 +34,7 @@ class BaseLearner(ABC):
             batch(ndarray): training batch for the algorithm
 
         Return:
-            new_params(ndarray): updated parameters after 1 epoch
+            new_params(FrozenDict): updated parameters after 1 epoch
         """
         raise NotImplementedError
 
