@@ -2,11 +2,12 @@ from functools import partial
 from typing import Callable, List, Tuple
 
 import jax
+import jax.numpy as jnp
 from flax.training.train_state import TrainState
 from jax.numpy import ndarray
 
 
-class ModelTrainer:
+class CNP:
     @staticmethod
     @partial(jax.jit, static_argnums=(3, 4))
     def meta_train_step(
@@ -37,7 +38,7 @@ class ModelTrainer:
             batch_decoder_state = decoder_state.replace(params=decoder_params)
 
             loss, metrics_value = jax.vmap(
-                ModelTrainer.meta_loss,
+                CNP.meta_loss,
                 in_axes=(None, None, None, 0, None, None),
             )(batch_encoder_state, batch_decoder_state, loss_fn, tasks, metrics, True)
             return loss.mean(), [metric.mean() for metric in metrics_value]
@@ -77,7 +78,7 @@ class ModelTrainer:
         """
 
         loss, metrics_value = jax.vmap(
-            ModelTrainer.meta_loss,
+            CNP.meta_loss,
             in_axes=(None, None, None, 0, None, None),
         )(encoder_state, decoder_state, loss_fn, tasks, metrics, False)
         return loss.mean(), [metric.mean() for metric in metrics_value]
@@ -117,3 +118,43 @@ class ModelTrainer:
         metrics_value = [metric(logits, y_test) for metric in metrics]
 
         return loss_fn(logits, y_test), metrics_value
+
+
+class Aggregator:
+    """Class containing different aggregation functions for the aggregate step in a CNP model."""
+
+    @staticmethod
+    def regression(r: ndarray) -> ndarray:
+        """Aggregation function for regression tasks.
+
+        This function returns the mean calculated along the batch dimention.
+
+        Args:
+            r (shots, ...): Encoder output for each datapoint in a batch.
+
+        Returns:
+            ndarray: Aggregated output.
+        """
+        aggregates = r.mean(0)
+        return aggregates
+
+    @staticmethod
+    def classification(r: ndarray, y: ndarray, ways: int) -> ndarray:
+        """Aggregation function for classification tasks.
+
+        This function returns the classwise mean calculated along the batch dimention and concatenates them
+
+        Args:
+            r (ways * shots, ...): Encoder output for each datapoint in a batch
+            y (ways * shots, ...): Target values for the support set.
+            ways (int): Number of classes per task.
+
+        Returns:
+            (ways, ...): Aggregated output.
+        """
+        ways_idx = jnp.arange(ways)
+        aggregates = jax.vmap(
+            lambda a, b, c: jnp.where(b == c, a.T, 0).T.sum(0), in_axes=(None, None, 0)
+        )(r, y, ways_idx)
+        aggregates = aggregates.reshape(-1) / ways
+        return aggregates
