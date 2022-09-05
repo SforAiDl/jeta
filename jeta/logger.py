@@ -121,7 +121,7 @@ class TensorboardLogger(object):
                 tf.summary.histogram(name, histogram, step=step)
 
 
-class Wandblogger(object):
+class WandbLogger(object):
     """
     Creating a wandb logger
     """
