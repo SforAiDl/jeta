@@ -2,6 +2,7 @@ from functools import partial
 from typing import Callable, List, Tuple
 
 import jax
+import logger
 import optax
 from flax import struct
 from flax.training import train_state
@@ -41,6 +42,7 @@ class OptiTrainer:
         state: MetaTrainState,
         tasks,
         metrics: List[Callable[[ndarray, ndarray], ndarray]] = [],
+        logger_type: str = "tensorboard",
     ) -> Tuple[MetaTrainState, ndarray, List[ndarray]]:
         """Performs a single meta-training step on a batch of tasks.
 
@@ -89,6 +91,18 @@ class OptiTrainer:
         state = state.replace(
             step=state.step + 1, params=params, opt_state=new_opt_state
         )
+        if logger_type == "tensorboard":
+            logger.TensorboardLogger.__enter__(state.step)
+            logger.TensorboardLogger.scalar("loss", loss, state.step)
+            for i, metric in enumerate(metrics):
+                logger.TensorboardLogger.scalar(
+                    metric.__name__, metrics_value[i], state.step
+                )
+        if logger_type == "wandb":
+            logger.WandbLogger.__enter__(state.step)
+            logger.WandbLogger.scalar("loss", loss, state.step)
+            for i, metric in enumerate(metrics):
+                logger.WandbLogger.scalar(metric.__name__, metrics_value[i], state.step)
 
         return state, loss, metrics_value
 
